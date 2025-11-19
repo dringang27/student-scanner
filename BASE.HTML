@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Base (LocalStorage)</title>
+
+<style>
+body { font-family:'Segoe UI', sans-serif; background:linear-gradient(to bottom right,#4f46e5,#06b6d4); color:white; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; }
+.container { background:rgba(255,255,255,0.15); padding:30px; border-radius:20px; width:380px; text-align:center; box-shadow:0 6px 18px rgba(0,0,0,0.25); }
+button { width:100%; padding:12px; margin-top:10px; border:none; color:black; background:#4ade80; border-radius:12px; font-weight:bold; cursor:pointer; }
+button:hover { background:#22c55e; }
+.danger { background:#f87171; color:white; }
+.danger:hover { background:#ef4444; }
+.history-box { margin-top:20px; max-height:200px; overflow-y:auto; background:rgba(255,255,255,0.2); padding:12px; border-radius:10px; text-align:left; }
+.history-item { background:rgba(255,255,255,0.25); padding:8px; border-radius:8px; margin-bottom:8px; color:#fff; font-size:14px; display:flex; justify-content:space-between; align-items:center; }
+.export-btn { margin-top:10px; background:#facc15; color:black; }
+.export-btn:hover { background:#eab308; }
+</style>
+</head>
+<body>
+
+<div class="container">
+<h2>Welcome, <span id="userName"></span>!</h2>
+
+<button onclick="scanQR()">📷 Scan QR</button>
+<button onclick="clearHistory()" class="danger">🗑️ Clear History</button>
+<button onclick="logout()" class="danger">Logout</button>
+<button onclick="exportHistory()" class="export-btn">📄 Export History</button>
+
+<h3 style="margin-top:20px;">📜 Scan History</h3>
+<div class="history-box" id="historyList"></div>
+</div>
+
+<script>
+// Display logged-in account
+document.getElementById("userName").textContent = localStorage.getItem("accountName") || "User";
+
+// Extract last part of QR URL
+function extractScanName(url){
+    let parts = url.split("?");
+    return parts[parts.length-1];
+}
+
+// Load scan history
+function loadHistory(){
+    const historyList = document.getElementById("historyList");
+    historyList.innerHTML = "";
+    const history = JSON.parse(localStorage.getItem("scanHistory")) || [];
+
+    if(history.length===0){
+        historyList.innerHTML = "<p>No scan history yet.</p>";
+        return;
+    }
+
+    history.forEach((entry,index)=>{
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.innerHTML = `<span>${entry.name} • ${entry.time}</span>`;
+        historyList.appendChild(div);
+    });
+}
+
+loadHistory();
+
+// Save scan history
+function saveScanHistory(scannedURL){
+    const scanName = extractScanName(scannedURL);
+    const history = JSON.parse(localStorage.getItem("scanHistory")) || [];
+
+    history.unshift({
+        name: scanName,
+        time: new Date().toLocaleString(),
+        url: scannedURL
+    });
+
+    localStorage.setItem("scanHistory", JSON.stringify(history));
+    loadHistory();
+}
+
+// Scan QR
+function scanQR(){
+    // Prompt user to paste scanned QR URL (Binary Eye cannot auto-return in local file)
+    const scannedURL = prompt("Paste scanned QR result here:");
+    if(!scannedURL) return;
+
+    saveScanHistory(scannedURL);
+
+    // Attempt to open Binary Eye app
+    window.location.href = "binaryeye://scan";
+    setTimeout(()=>{ alert("If Binary Eye did not open, ensure the app is installed."); },1000);
+}
+
+// Clear history
+function clearHistory(){
+    if(confirm("Clear all scan history?")){
+        localStorage.removeItem("scanHistory");
+        loadHistory();
+    }
+}
+
+// Logout
+function logout(){
+    localStorage.removeItem("accountName");
+    window.location.href="login.html";
+}
+
+// Export history to Excel (CSV format)
+function exportHistory(){
+    const history = JSON.parse(localStorage.getItem("scanHistory")) || [];
+    if(history.length===0){ alert("No history to export"); return; }
+
+    let csv = "Scan Name,Timestamp,URL\n";
+    history.forEach(entry => {
+        csv += `"${entry.name}","${entry.time}","${entry.url}"\n`;
+    });
+
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "scan_history.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+</script>
+
+</body>
+</html>
